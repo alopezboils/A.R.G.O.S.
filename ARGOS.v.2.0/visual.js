@@ -24,21 +24,31 @@ function calcularPorcentajesMacros(ia) {
     };
 }
 
-function renderBitacora(historialIA, resumenActividades) {
-    return historialIA.slice().reverse().map(item => {
-        const actividadReal = resumenActividades[item.fecha] ?? '<span style="color:#505050">SIN REGISTRO</span>';
-        const checked = item.cumplido ? 'checked' : '';
-        return `
-        <div class="bitacora-row">
-            <div class="bitacora-cell date-cell">${item.fecha.slice(5)}</div>
-            <div class="bitacora-cell real-cell">${actividadReal}</div>
-            <div class="bitacora-cell ia-cell">
-                <label style="cursor:pointer; display:flex; align-items:center; gap:6px;">
-                    <input type="checkbox" class="ia-checkbox" data-fecha="${item.fecha}" ${checked}>
-                    <span>${item.resumen}</span>
-                </label>
-            </div>
-        </div>`;
+function renderBitacora(historialIA, resumenActividades, hoy) {
+    const fechasSet = new Set([
+        hoy,
+        ...Object.keys(resumenActividades),
+        ...historialIA.map(h => h.fecha)
+    ]);
+    
+    const fechasOrdenadas = Array.from(fechasSet).sort().reverse().slice(0, 14);
+
+    return fechasOrdenadas.map(fecha => {
+        const itemIA = historialIA.find(h => h.fecha === fecha) || {};
+        const actividadReal = resumenActividades[fecha] ?? '<span style="color:#505050">SIN REGISTRO</span>';
+        const checked = itemIA.cumplido ? 'checked' : '';
+        const resumen = itemIA.resumen && itemIA.resumen !== 'No generada' ? itemIA.resumen : '<span style="color:#888; font-style:italic;">LIBRE / SIN IA</span>';
+        
+        return '<div class="bitacora-row">' +
+            '<div class="bitacora-cell date-cell">' + fecha.slice(5) + '</div>' +
+            '<div class="bitacora-cell real-cell">' + actividadReal + '</div>' +
+            '<div class="bitacora-cell ia-cell">' +
+                '<label style="cursor:pointer; display:flex; align-items:center; gap:6px;">' +
+                    '<input type="checkbox" class="ia-checkbox" data-fecha="' + fecha + '" ' + checked + '>' +
+                    '<span>' + resumen + '</span>' +
+                '</label>' +
+            '</div>' +
+        '</div>';
     }).join('');
 }
 
@@ -66,40 +76,39 @@ function renderSensaciones(historialIA, resumenActividades, hoy) {
             descripcion = 'DESCANSO / SIN ACTIVIDAD REGISTRADA';
         }
 
-        return `
-        <div class="bloque-entrenamiento sensacion-card">
-            <div class="sensacion-header">
-                <h4 class="sensacion-titulo">REGISTRO: ${fecha}</h4>
-                <span class="sensacion-resumen">${descripcion}</span>
-            </div>
-            <div class="sensacion-sliders">
-                <div>
-                    <div class="slider-row">
-                        <label class="slider-label">ESFUERZO PERCIBIDO (RPE)</label>
-                        <span id="val-rpe-${fecha}" class="slider-val rpe-val">${rpe}/10</span>
-                    </div>
-                    <input type="range" min="1" max="10" value="${rpe}" class="slider-sensacion" data-tipo="rpe" data-fecha="${fecha}">
-                </div>
-                <div>
-                    <div class="slider-row">
-                        <label class="slider-label">NIVEL DE DOLOR MUSCULAR</label>
-                        <span id="val-dolor-${fecha}" class="slider-val dolor-val">${dolor}/10</span>
-                    </div>
-                    <input type="range" min="1" max="10" value="${dolor}" class="slider-sensacion" data-tipo="dolor" data-fecha="${fecha}">
-                </div>
-            </div>
-            <div class="sensacion-notas">
-                <label class="slider-label">ANOTACIONES</label>
-                <textarea class="textarea-comentario" data-fecha="${fecha}" placeholder="Ingresa estado muscular o sensaciones..." rows="2">${comentario}</textarea>
-            </div>
-        </div>`;
+        return '<div class="bloque-entrenamiento sensacion-card">' +
+            '<div class="sensacion-header">' +
+                '<h4 class="sensacion-titulo">REGISTRO: ' + fecha + '</h4>' +
+                '<span class="sensacion-resumen">' + descripcion + '</span>' +
+            '</div>' +
+            '<div class="sensacion-sliders">' +
+                '<div>' +
+                    '<div class="slider-row">' +
+                        '<label class="slider-label">ESFUERZO PERCIBIDO (RPE)</label>' +
+                        '<span id="val-rpe-' + fecha + '" class="slider-val rpe-val">' + rpe + '/10</span>' +
+                    '</div>' +
+                    '<input type="range" min="1" max="10" value="' + rpe + '" class="slider-sensacion" data-tipo="rpe" data-fecha="' + fecha + '">' +
+                '</div>' +
+                '<div>' +
+                    '<div class="slider-row">' +
+                        '<label class="slider-label">NIVEL DE DOLOR MUSCULAR</label>' +
+                        '<span id="val-dolor-' + fecha + '" class="slider-val dolor-val">' + dolor + '/10</span>' +
+                    '</div>' +
+                    '<input type="range" min="1" max="10" value="' + dolor + '" class="slider-sensacion" data-tipo="dolor" data-fecha="' + fecha + '">' +
+                '</div>' +
+            '</div>' +
+            '<div class="sensacion-notas">' +
+                '<label class="slider-label">ANOTACIONES</label>' +
+                '<textarea class="textarea-comentario" data-fecha="' + fecha + '" placeholder="Ingresa estado muscular o sensaciones..." rows="2">' + comentario + '</textarea>' +
+            '</div>' +
+        '</div>';
     }).join('');
 }
 
 function generarHTML(datos, retroIA, ia, memoria, lesiones, historialIA, porcentajePlan, nombreAtleta = 'Atleta', pendingIA = false) {
     const plato = calcularPlato(datos.estadoIntensidad);
     const { pctCarbos, pctProtes, pctGrasas } = calcularPorcentajesMacros(ia);
-    const bitacoraHTML = renderBitacora(historialIA, datos.resumenActividades);
+    const bitacoraHTML = renderBitacora(historialIA, datos.resumenActividades, datos.hoy);
     const sensacionesHTML = renderSensaciones(historialIA, datos.resumenActividades, datos.hoy);
 
     const chartLabels = JSON.stringify(datos.chartLabels);
@@ -108,29 +117,27 @@ function generarHTML(datos, retroIA, ia, memoria, lesiones, historialIA, porcent
     const chartFitness = JSON.stringify(datos.chartFitness);
     const chartCargaTrabajo = JSON.stringify(datos.chartCargaTrabajo);
 
-    const boxSemana = (titulo, sem, isActual) => `
-        <div class="box-summary box-multisport" style="${isActual ? 'border-left-color: var(--primary);' : 'border-left-color: #555;'}">
-            <div class="multisport-title" style="${isActual ? 'color: var(--primary);' : 'color: #888;'}">${titulo} <span style="float:right; color:#555;">SEM. ${sem.numSemana}</span></div>
-            <div class="multisport-row"><span class="ms-label">🏃 Carrera:</span> <span class="ms-val">${sem.runTime} <span style="color:#555;">|</span> ${sem.runKm} km</span></div>
-            <div class="multisport-row"><span class="ms-label">🚴 Ciclismo:</span> <span class="ms-val">${sem.rideTime} <span style="color:#555;">|</span> ${sem.rideKm} km</span></div>
-            <div class="multisport-row"><span class="ms-label">🏊 Natación:</span> <span class="ms-val">${sem.swimTime} <span style="color:#555;">|</span> ${sem.swimKm} km</span></div>
-            <div class="multisport-row"><span class="ms-label">🏋️ Fuerza:</span> <span class="ms-val">${sem.strengthTime}</span></div>
-            <div class="multisport-row" style="margin-top:6px; border-top:1px solid #222; padding-top:6px;"><span class="ms-label" style="color:#ff8800;">🔥 Kcal Activas:</span> <span class="ms-val" style="color:#ff8800;">${sem.kcal}</span></div>
-            <div class="multisport-row"><span class="ms-label" style="color:var(--primary);">📈 Carga Impacto:</span> <span class="ms-val" style="color:var(--primary);">${sem.carga}</span></div>
-        </div>`;
+    const boxSemana = (titulo, sem, isActual) => 
+        '<div class="box-summary box-multisport" style="border-left-color: ' + (isActual ? 'var(--primary)' : '#555') + ';">' +
+            '<div class="multisport-title" style="color: ' + (isActual ? 'var(--primary)' : '#888') + ';">' + titulo + ' <span style="float:right; color:#555;">SEM. ' + sem.numSemana + '</span></div>' +
+            '<div class="multisport-row"><span class="ms-label">🏃 Carrera:</span> <span class="ms-val">' + sem.runTime + ' <span style="color:#555;">|</span> ' + sem.runKm + ' km</span></div>' +
+            '<div class="multisport-row"><span class="ms-label">🚴 Ciclismo:</span> <span class="ms-val">' + sem.rideTime + ' <span style="color:#555;">|</span> ' + sem.rideKm + ' km</span></div>' +
+            '<div class="multisport-row"><span class="ms-label">🏊 Natación:</span> <span class="ms-val">' + sem.swimTime + ' <span style="color:#555;">|</span> ' + sem.swimKm + ' km</span></div>' +
+            '<div class="multisport-row"><span class="ms-label">🏋️ Fuerza:</span> <span class="ms-val">' + sem.strengthTime + '</span></div>' +
+            '<div class="multisport-row" style="margin-top:6px; border-top:1px solid #222; padding-top:6px;"><span class="ms-label" style="color:#ff8800;">🔥 Kcal Activas:</span> <span class="ms-val" style="color:#ff8800;">' + sem.kcal + '</span></div>' +
+            '<div class="multisport-row"><span class="ms-label" style="color:var(--primary);">📈 Carga Impacto:</span> <span class="ms-val" style="color:var(--primary);">' + sem.carga + '</span></div>' +
+        '</div>';
 
-    const analisisHtml = `
-        <h4 style="color:#ff8800; border-bottom:1px solid var(--primary-dark); padding-bottom:4px; margin-bottom:8px; margin-top:0; font-size:12px; letter-spacing:1px; text-transform:uppercase;">Evaluación de la Última Misión</h4>
-        <p style="margin-bottom:16px;">${retroIA.analisisRetrospectivo}</p>
-        <h4 style="color:var(--primary); border-bottom:1px solid var(--primary-dark); padding-bottom:4px; margin-bottom:8px; font-size:12px; letter-spacing:1px; text-transform:uppercase;">Justificación de Nueva Prescripción</h4>
-        ${pendingIA 
+    const analisisHtml = 
+        '<h4 style="color:#ff8800; border-bottom:1px solid var(--primary-dark); padding-bottom:4px; margin-bottom:8px; margin-top:0; font-size:12px; letter-spacing:1px; text-transform:uppercase;">Evaluación de la Última Misión</h4>' +
+        '<p style="margin-bottom:16px;">' + retroIA.analisisRetrospectivo + '</p>' +
+        '<h4 style="color:var(--primary); border-bottom:1px solid var(--primary-dark); padding-bottom:4px; margin-bottom:8px; font-size:12px; letter-spacing:1px; text-transform:uppercase;">Justificación de Nueva Prescripción</h4>' +
+        (pendingIA 
             ? '<p style="color:#888; font-style:italic;">Sistema IA en reposo. Esperando solicitud de prescripción manual.</p>' 
-            : '<p>' + ia.analisisPrescripcion + '</p>'
-        }
-    `;
+            : '<p>' + ia.analisisPrescripcion + '</p>');
 
     const entrenamientoHtml = pendingIA
-        ? '<button id="btn-generar-ia" class="file-upload-btn" style="width:100%; padding:15px; margin-top:10px; font-size:14px; background:var(--primary); color:#fff;">⚡ SOLICITAR ANÁLISIS Y ENTRENAMIENTO DE HOY</button><div id="ia-loading" style="display:none; color:#ff8800; text-align:center; padding:20px; font-family:\'Consolas\', monospace; font-weight:bold; letter-spacing:2px; font-size:12px;">CONECTANDO CON EL MOTOR IA... ESPERE.</div>'
+        ? '<button id="btn-generar-ia" class="file-upload-btn" style="width:100%; padding:15px; margin-top:10px; font-size:14px; background:var(--primary); color:#fff;">⚡ SOLICITAR ENTRENAMIENTO DE HOY</button><div id="ia-loading" style="display:none; color:#ff8800; text-align:center; padding:20px; font-family:\'Consolas\', monospace; font-weight:bold; letter-spacing:2px; font-size:12px;">CONECTANDO CON EL MOTOR IA... ESPERE.</div>'
         : '<div class="seccion-ruta"><div class="tag-ruta">Calentamiento</div>' + ia.calentamiento + '</div><div class="seccion-ruta"><div class="tag-ruta">Principal</div>' + ia.principal + '</div><div class="seccion-ruta"><div class="tag-ruta">Enfriamiento</div>' + ia.enfriamiento + '</div>';
 
     const nutricionHtml = pendingIA
@@ -348,38 +355,93 @@ function generarHTML(datos, retroIA, ia, memoria, lesiones, historialIA, porcent
         </div>
     </div>
 
+    <!-- PESTAÑA 2: AUDITORÍA NUTRICIONAL -->
     <div id="tab-nutricion" class="tab-content">
-        <div class="grid-resumen" style="grid-template-columns: repeat(3,1fr);">
-            <div class="box-summary"><div class="box-val" style="color:#ff8800">${datos.caloriasCard} kcal</div><div class="box-lbl">Gasto Última Sesión</div></div>
-            <div class="box-summary"><div class="box-val" style="color:#ff8800">${datos.avgCalorias} kcal</div><div class="box-lbl">Media Activa del Ciclo</div></div>
-            <div class="box-summary"><div class="box-val" style="color:var(--primary); font-size:18px;">${ia.dieta}</div><div class="box-lbl">Estrategia Nutricional</div></div>
-        </div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
-            <div class="bloque-nutricion"><h3 style="color:#fff;">Macronutrientes Estimados</h3>
-                <div class="macro-container">
-                    <div class="macro-row"><div class="macro-label">Carbohidratos</div><div class="macro-bar-bg"><div class="macro-bar-fill" style="width:${pctCarbos}%; background:#92e5a1;"></div></div><div class="macro-value" style="color:#92e5a1">${ia.carbos}g</div></div>
-                    <div class="macro-row"><div class="macro-label">Proteína</div><div class="macro-bar-bg"><div class="macro-bar-fill" style="width:${pctProtes}%; background:var(--primary);"></div></div><div class="macro-value" style="color:var(--primary);">${ia.protes}g</div></div>
-                    <div class="macro-row"><div class="macro-label">Grasas</div><div class="macro-bar-bg"><div class="macro-bar-fill" style="width:${pctGrasas}%; background:#ff8800;"></div></div><div class="macro-value" style="color:#ff8800">${ia.grasas}g</div></div>
-                </div>
+        <div class="grid-resumen" style="grid-template-columns: 1fr 1fr;">
+            <div class="box-summary" style="border-color:#ff8800;">
+                <div class="box-val" style="color:#ff8800" id="objetivo-calorico">${datos.avgCalorias} kcal</div>
+                <div class="box-lbl">Referencia: Gasto Activo Promedio</div>
             </div>
-            <div class="bloque-nutricion"><h3 style="color:#fff;">Proporciones del Plato</h3>
-                <div class="plate-container"><div class="plate-title" style="color:${plato.color}">${plato.nombre}</div>
-                    <div class="plate-stats">
-                        <div class="plate-stat"><div class="plate-stat-val" style="color:#e3c57a">${plato.granos}</div><div class="plate-stat-lbl">Granos</div></div>
-                        <div class="plate-stat"><div class="plate-stat-val" style="color:#8fb3c2">${plato.vegetales}</div><div class="plate-stat-lbl">Vegetales</div></div>
-                        <div class="plate-stat"><div class="plate-stat-val" style="color:var(--primary);">${plato.proteina}</div><div class="plate-stat-lbl">Proteína</div></div>
+            <div class="box-summary">
+                <div class="box-val" style="color:#fff">El Plato del Atleta</div>
+                <div class="box-lbl">Guía Visual Estándar</div>
+            </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1.5fr; gap:20px;">
+            
+            <!-- PANEL IZQUIERDO: INPUT DEL USUARIO -->
+            <div class="bloque-nutricion">
+                <h3 style="color:#fff;">Carga de Ingesta</h3>
+                
+                <label style="font-size:11px; color:#888; text-transform:uppercase; letter-spacing:1px; display:block; margin-bottom:5px;">Estrategia Nutricional Preferida</label>
+                <select id="selector-dieta" class="select-dieta">
+                    <option value="Alta en Carbohidratos">Alta en Carbohidratos (Rendimiento)</option>
+                    <option value="Alta en Proteínas">Alta en Proteínas (Hipertrofia/Retención)</option>
+                    <option value="Cetogénica (Keto)">Cetogénica / Baja en Carbohidratos</option>
+                    <option value="Ayuno Intermitente">Ayuno Intermitente / Ventana Reducida</option>
+                    <option value="Equilibrada">Equilibrada Padrón</option>
+                </select>
+
+                <label style="font-size:11px; color:#888; text-transform:uppercase; letter-spacing:1px; display:block; margin-bottom:5px; margin-top:10px;">Captura Visual</label>
+                <label class="file-upload-btn">
+                    <input type="file" id="input-foto" accept="image/*" style="display:none;">
+                    SELECCIONAR IMAGEN
+                </label>
+                <img id="preview-img" alt="Vista previa de la comida">
+
+                <label style="font-size:11px; color:#888; text-transform:uppercase; letter-spacing:1px; display:block; margin-top:15px;">Ingredientes Ocultos o Notas (Opcional)</label>
+                <textarea id="texto-notas-comida" class="textarea-comentario" rows="2" placeholder="Ej: Aceite de oliva añadido, salsa dulce..."></textarea>
+
+                <button id="btn-analizar" class="btn-analizar" disabled>Iniciar Escáner de IA</button>
+            </div>
+
+            <!-- PANEL DERECHO: RESULTADOS DE LA IA -->
+            <div class="bloque-nutricion" style="display:flex; flex-direction:column;">
+                <h3 style="color:#fff;">Análisis Científico del Sistema</h3>
+                
+                <div id="loading-overlay">Analizando matriz de nutrientes... Por favor espera.</div>
+
+                <div id="resultados-analisis" style="display:none; font-family:'Segoe UI', sans-serif;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #330000; padding-bottom:10px; margin-bottom:15px;">
+                        <span style="font-family:'Consolas', monospace; color:#888; text-transform:uppercase; letter-spacing:1px; font-size:12px;">Carga Energética Detectada</span>
+                        <span id="res-kcal" style="font-family:'Consolas', monospace; font-size:24px; font-weight:bold; color:#ff8800;">---</span>
+                    </div>
+
+                    <div style="font-family:'Consolas', monospace; color:#888; text-transform:uppercase; letter-spacing:1px; font-size:12px; margin-bottom:8px;">Macronutrientes Estimados</div>
+                    <div id="res-macros" class="seccion-ruta" style="border-left-color:#8fb3c2; color:#fff; font-size:15px;">---</div>
+
+                    <div style="font-family:'Consolas', monospace; color:#888; text-transform:uppercase; letter-spacing:1px; font-size:12px; margin-top:20px; margin-bottom:8px;">Evaluación Objetiva</div>
+                    <div id="res-evaluacion" class="seccion-ruta" style="border-left-color:var(--primary); color:#ddd;">---</div>
+
+                    <div style="font-family:'Consolas', monospace; color:#888; text-transform:uppercase; letter-spacing:1px; font-size:12px; margin-top:20px; margin-bottom:8px;">Recomendación de Ajuste</div>
+                    <div id="res-recomendacion" class="seccion-ruta" style="border-left-color:#56d364; background:#051005; color:#ddd;">---</div>
+                </div>
+                
+                <!-- Guía estática (se oculta al analizar) -->
+                <div id="guia-plato" style="margin-top:auto; margin-bottom:auto;">
+                    <div class="plate-container">
+                        <div class="plate-title" style="color:${plato.color}">${plato.nombre}</div>
+                        <div class="plate-stats">
+                            <div class="plate-stat"><div class="plate-stat-val" style="color:#e3c57a">${plato.granos}</div><div class="plate-stat-lbl">Granos</div></div>
+                            <div class="plate-stat"><div class="plate-stat-val" style="color:#8fb3c2">${plato.vegetales}</div><div class="plate-stat-lbl">Vegetales</div></div>
+                            <div class="plate-stat"><div class="plate-stat-val" style="color:var(--primary);">${plato.proteina}</div><div class="plate-stat-lbl">Proteína</div></div>
+                        </div>
                     </div>
                 </div>
+
             </div>
         </div>
+        
         <div class="bloque-entrenamiento bloque-consejo" style="margin-top:20px; border-color:#331100;">
-            <h3>Recomendación Nutricional</h3>
+            <h3>Directiva Nutricional de la Misión</h3>
             <div class="seccion-ruta" style="background:#050000; font-family:'Segoe UI', sans-serif;">
                 <p style="margin:0; color:#ddd;">${nutricionHtml}</p>
             </div>
         </div>
     </div>
 
+    <!-- PESTAÑA 3: DIARIO MÉDICO -->
     <div id="tab-sensaciones" class="tab-content">
         <div style="max-width:820px; margin:0 auto;">
             <div class="panel-lesiones">
